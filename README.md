@@ -23,3 +23,16 @@ This project solves that by building an automated **End-to-End Data Pipeline** t
 1. Clone this repository:
    ```bash
    git clone https://github.com/brianilham/ai-expense-categorizer.git
+
+2. Install the required dependencies
+   ```bash
+   pip install pandas google-generativeai python-dotenv sqlalchemy psycopg2-binary
+3. Create a .env file in the root directory and add your API keys and database credentials:
+   ```bash
+   GEMINI_API_KEY=your_api_key
+   user=postgres.[your_project_id]
+   password=your_database_password
+   host=aws-0-ap-southeast-1.pooler.supabase.com
+   port=5432
+   dbname=postgres
+4. Run the Jupyter Notebook Expense_Categorizer.ipynb to process the raw transaction data and push the AI-categorized results to your Supabase database.
