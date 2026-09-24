@@ -1,7 +1,6 @@
 # AI-Powered Expense Categorizer: End-to-End Data Pipeline & BI Dashboard
 
 ## Live Dashboard
-![Looker Studio Dashboard]([URL_GAMBAR_SCREENSHOT_DASHBOARD_LU_DISINI])
 > **[View the Live Interactive Dashboard Here](https://datastudio.google.com/s/qnY-dLgdh9s)**
 
 ## Business Problem & Impact
