@@ -15,6 +15,7 @@ from src.schemas import RawTransactionSchema, CleanedExpenseSchema, CategorizedE
 from src.preprocessing import clean_and_filter_expenses
 from src.categorizer import categorize_expenses
 from src.data_generator import generate_synthetic_transactions
+from src.parsers import load_statement_file
 from src.db_duckdb import (
     load_dataframe_to_duckdb,
     get_category_breakdown,
@@ -310,12 +311,12 @@ def main() -> None:
 
         if uploaded_file is not None:
             try:
-                uploaded_df = pd.read_csv(uploaded_file)
+                uploaded_df = load_statement_file(uploaded_file)
                 st.session_state["raw_df"] = uploaded_df
                 categorized, metrics = process_pipeline(uploaded_df)
                 st.session_state["categorized_df"] = categorized
                 st.session_state["pipeline_metrics"] = metrics
-                st.success("Uploaded dataset validated and processed.")
+                st.success(f"File validated successfully ({len(uploaded_df)} transactions ingested).")
             except Exception as err:
                 st.error(f"Schema Contract Violation: {err}")
 
