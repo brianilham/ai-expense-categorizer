@@ -8,9 +8,7 @@
 
 An automated expense classification pipeline and analytical dashboard for Indonesian bank statements. It matches known recurring transactions through local regex heuristics (<1ms, $0 cost) and routes ambiguous descriptions to Google Gemini 3.5 Flash Lite in batches. Aggregations run locally in DuckDB, and records persist to Supabase PostgreSQL.
 
-## Live Demos
-- Local dashboard: `streamlit run app.py`
-- Cloud BI report: [Looker Studio Dashboard](https://datastudio.google.com/s/qnY-dLgdh9s)
+The pipeline has been tested and verified against actual personal bank records (Bank Mandiri e-Statements). For privacy and personal data protection, the public repository and default dashboard display use synthetic benchmark data.
 
 ---
 
@@ -132,7 +130,7 @@ Run pytest to check data contracts, preprocessing, and analytical queries:
 ```bash
 pytest
 ```
-*Expected: 7 passed.*
+*Expected: 9 passed.*
 
 ---
 
