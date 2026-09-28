@@ -1,20 +1,20 @@
-# Enterprise Expense Intelligence & Categorization Platform
+# Expense Categorizer
 
 [![Python 3.10+](https://img.shields.io/badge/python-3.10%2B-blue.svg)](https://www.python.org/downloads/)
 [![Data Contract: Pandera](https://img.shields.io/badge/data%20contract-pandera-purple.svg)](https://pandera.readthedocs.io/)
 [![OLAP Engine: DuckDB](https://img.shields.io/badge/olap-duckdb-yellow.svg)](https://duckdb.org/)
 [![Database: Supabase](https://img.shields.io/badge/cloud%20db-supabase%20postgresql-emerald.svg)](https://supabase.com/)
-[![Frontend: Streamlit](https://img.shields.io/badge/frontend-streamlit%20anti--slop-red.svg)](https://streamlit.io/)
+[![Frontend: Streamlit](https://img.shields.io/badge/frontend-streamlit-red.svg)](https://streamlit.io/)
 
-Production-grade, AI-augmented expense classification engine and analytical intelligence platform built using **Spec-Driven Development (SDD)**. Integrates a **Two-Tier Hybrid Architecture** (sub-millisecond Heuristics + batched Gemini 3.5 Flash Lite), **Pandera Data Contracts** for fail-fast schema validation, **In-Memory DuckDB OLAP** for instant query execution (<1ms), and an executive dashboard adhering to the **21 Anti-Slop Corporate Design Rules**.
+An automated expense classification pipeline and analytical dashboard for Indonesian bank statements. It matches known recurring transactions through local regex heuristics (<1ms, $0 cost) and routes ambiguous descriptions to Google Gemini 3.5 Flash Lite in batches. Aggregations run locally in DuckDB, and records persist to Supabase PostgreSQL.
 
-## 🌐 Live Demos
-- **Streamlit Local Application:** `streamlit run app.py`
-- **Interactive Cloud BI Report:** [View Looker Studio Dashboard](https://datastudio.google.com/s/qnY-dLgdh9s)
+## Live Demos
+- Local dashboard: `streamlit run app.py`
+- Cloud BI report: [Looker Studio Dashboard](https://datastudio.google.com/s/qnY-dLgdh9s)
 
 ---
 
-## 🏗️ System Architecture
+## System Architecture
 
 ```mermaid
 flowchart TD
@@ -36,8 +36,8 @@ flowchart TD
         I --> K[(Supabase PostgreSQL Cloud - Session Pooler :5432)]
     end
 
-    subgraph Corporate Anti-Slop Dashboard
-        J --> L[Streamlit Executive Interface]
+    subgraph Dashboard
+        J --> L[Streamlit Interface]
         L --> M[KPI Metric Cards]
         L --> N[Plotly Category Breakdown]
         L --> O[Temporal Cash Flow Trend]
@@ -47,63 +47,59 @@ flowchart TD
 
 ---
 
-## 🚀 Key Engineering Highlights
+## Architecture and Engineering Choices
 
-### 1. Two-Tier Hybrid Categorization Engine
-- **Tier-1 Heuristics (`src/rules_engine.py`)**: Deterministic regex matching for recurring Indonesian banking transactions (PLN, PDAM, BPJS, Telkomsel, GoFood, Grab, etc.) resolving in `<1ms` with **$0 API cost**.
-- **Tier-2 LLM Batching (`src/llm_categorizer.py`)**: Batched inference via **Google Gemini 3.5 Flash Lite** with JSON-enforced output schema, minimizing API roundtrips and token consumption.
-- **Cost Reduction**: Achieves ~70–80% zero-cost direct matches, drastically cutting cloud inference overhead.
+### 1. Two-Tier Hybrid Pipeline
+- **Tier-1 heuristics (`src/rules_engine.py`)**: matches recurring merchants (PLN, PDAM, BPJS, Telkomsel, GoFood, Grab) via regex in under 1ms with zero API cost.
+- **Tier-2 LLM batching (`src/llm_categorizer.py`)**: sends remaining unclassified merchants to Gemini 3.5 Flash Lite in a single JSON array request.
+- **Cost control**: tier-1 handles roughly 70–80% of transactions, cutting external API calls to the remaining 20–30%.
 
-### 2. Contract-First Engineering with Pandera
-- **Fail-Fast Ingestion**: Enforces strict typing, positive-only amounts, ISO-8601 date formats, and valid transaction types (`Debit`/`Credit`).
-- **Zero Schema Drift**: Ensures broken or malicious bank statement rows are caught at the boundary before entering analytical storage or LLM pipelines.
+### 2. Pandera Data Contracts
+- **Boundary validation**: enforces strict column types, positive amounts, ISO-8601 dates, and valid mutation types (`Debit`/`Credit`).
+- **Fail-fast errors**: rejects malformed statement rows before preprocessing or inference.
 
 ### 3. Dual Storage Architecture
-- **In-Memory OLAP (DuckDB)**: Powers dashboard charts and aggregated metrics with sub-millisecond query execution (`<1ms`).
-- **Cloud Persistence (Supabase PostgreSQL)**: Uses **Session Pooler** (`aws-0-ap-southeast-1.pooler.supabase.com:5432`) with IPv4 compatibility and SSL enforcement.
+- **In-memory OLAP (DuckDB)**: runs analytical queries and aggregations in RAM (<1ms) for the Streamlit UI.
+- **Cloud persistence (Supabase PostgreSQL)**: connects via session pooler (`aws-0-ap-southeast-1.pooler.supabase.com:5432`) over SSL, bypassing direct IPv6 routing limits.
 
-### 4. High-Taste Corporate Dashboard (Streamlit)
-- Implements the **21 Anti-Slop Corporate Design Rules**:
-  - **Zero Emojis**: Strictly formal typography and clean enterprise visual hierarchy.
-  - **Micro-Borders (`1px solid rgba(255,255,255,0.10)`)** over heavy drop-shadows.
-  - **Corporate Blue (`#0284c7`)** theming on a dark slate canvas (`#09090b`).
-  - **Asymmetric Grid (`70:30`)** for dominant visual insights vs. tabular breakdown.
-  - **Tufte Zero Chart-Junk Plotly Charts** with transparent backgrounds and high-contrast labels.
+### 4. Streamlit Dashboard
+- Uses an asymmetric 70:30 layout (distribution chart on the left, ranking table on the right).
+- Styled with neutral slate dark mode (`#09090b`), corporate blue accents (`#0284c7`), and transparent Plotly charts without decorative icons.
 
 ---
 
-## 📂 Project Structure
+## Project Structure
 
 ```text
 ai-expense-categorizer/
 ├── docs/
-│   ├── PRD.md                  # Product Requirements Document & SLAs
-│   ├── ARCHITECTURE.md         # Architecture Decision Records (ADRs) & Schemas
-│   └── IMPLEMENTATION.md       # SDD 5-Phase Checklist & Traceability
+│   ├── PRD.md                  # Product requirements and SLAs
+│   ├── ARCHITECTURE.md         # Architecture decisions and schemas
+│   └── IMPLEMENTATION.md       # Implementation checklist and traceability
 ├── src/
-│   ├── schemas.py              # Pandera Data Contracts (Raw, Cleaned, Categorized)
-│   ├── data_generator.py       # Realistic Indonesian Bank Statement Generator (Faker)
-│   ├── preprocessing.py        # Debit filtering & description normalization
-│   ├── rules_engine.py         # Tier-1 Heuristics & merchant regex matcher
-│   ├── llm_categorizer.py      # Tier-2 Gemini 3.5 Flash Lite batch categorizer
-│   ├── categorizer.py          # Hybrid Engine Orchestrator
-│   ├── db_duckdb.py            # In-memory DuckDB OLAP aggregator
-│   └── db_supabase.py          # Supabase PostgreSQL Session Pooler connector
+│   ├── schemas.py              # Pandera data contracts (Raw, Cleaned, Categorized)
+│   ├── data_generator.py       # Indonesian bank statement generator (Faker)
+│   ├── preprocessing.py        # Debit filtering and description normalization
+│   ├── rules_engine.py         # Tier-1 regex heuristics
+│   ├── llm_categorizer.py      # Tier-2 Gemini batch categorizer
+│   ├── categorizer.py          # Hybrid engine orchestrator
+│   ├── db_duckdb.py            # In-memory DuckDB queries
+│   └── db_supabase.py          # Supabase PostgreSQL connector
 ├── tests/
-│   ├── test_pipeline.py        # Unit tests for preprocessing & Pandera contracts
-│   ├── test_categorization.py  # Unit tests for Heuristics & Hybrid pipeline
-│   └── test_storage.py         # Unit tests for DuckDB aggregation & KPIs
-├── app.py                      # Anti-Slop Corporate Streamlit Dashboard
+│   ├── test_pipeline.py        # Unit tests for preprocessing and schema validation
+│   ├── test_categorization.py  # Unit tests for heuristics and hybrid pipeline
+│   └── test_storage.py         # Unit tests for DuckDB aggregation
+├── app.py                      # Streamlit dashboard
 ├── requirements.txt            # Python dependencies
-├── .env.example                # Template for environment credentials
-└── README.md                   # Enterprise Documentation
+├── .env.example                # Environment variables template
+└── README.md                   # Project documentation
 ```
 
 ---
 
-## ⚙️ Installation & Setup
+## Installation and Setup
 
-### 1. Clone & Setup Environment
+### 1. Clone the Repository
 ```bash
 git clone https://github.com/brianilham/ai-expense-categorizer.git
 cd ai-expense-categorizer
@@ -120,7 +116,7 @@ Create a `.env` file in the root directory:
 # Google Gemini API
 GEMINI_API_KEY=your_gemini_api_key_here
 
-# Supabase PostgreSQL (Session Pooler Configuration)
+# Supabase PostgreSQL (Session Pooler)
 user=postgres.your_project_ref
 password=your_database_password
 host=aws-0-ap-southeast-1.pooler.supabase.com
@@ -130,27 +126,27 @@ dbname=postgres
 
 ---
 
-## 🧪 Running Unit Tests
+## Running Unit Tests
 
-Run the full pytest suite to verify data contracts, preprocessing, and analytical aggregations:
+Run pytest to check data contracts, preprocessing, and analytical queries:
 ```bash
 pytest
 ```
-*Expected result: 7 passed in < 4s.*
+*Expected: 7 passed.*
 
 ---
 
-## 📊 Launching the Dashboard
+## Running the Dashboard
 
-Launch the corporate analytical dashboard:
+Start the Streamlit application:
 ```bash
 streamlit run app.py
 ```
-Open your browser at `http://localhost:8501`.
+Open `http://localhost:8501` in your browser.
 
 ---
 
-## 📋 Standard Expense Categories
+## Standard Expense Categories
 1. **F&B (Food & Beverages)**: Warteg, Resto, Cafe, Kopi, GoFood, GrabFood, ShopeeFood.
 2. **Belanja (Groceries & Shopping)**: Indomaret, Alfamart, Superindo, Tokopedia, Shopee.
 3. **Transportasi**: GoJek, Grab, Pertamina, Shell, Tol, Kereta, MRT.
@@ -164,5 +160,5 @@ Open your browser at `http://localhost:8501`.
 
 ---
 
-## 📄 License
-MIT License. Built for enterprise data portfolio demonstration.
+## License
+MIT License.

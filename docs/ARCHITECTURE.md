@@ -1,6 +1,6 @@
-# AI-Augmented Expense Categorizer - System Architecture & Data Flow
+# System Architecture and Data Flow
 
-## 1. High-Level Data Flow Architecture
+## 1. High-Level Data Flow
 
 ```mermaid
 flowchart TD
@@ -11,7 +11,7 @@ flowchart TD
     D -->|Tier 1: Keyword/Regex Match| E[Deterministic Rules Engine: <1ms]
     D -->|Tier 2: Ambiguous/Unique Merchants| F[Gemini 3.5 Flash Lite: Batch JSON Array]
     
-    E --> G[Merge Results & Compute Confidence]
+    E --> G[Merge Results & Compute Attribution]
     F --> G
     
     G --> H[(DuckDB: Local In-Memory OLAP)]
@@ -23,39 +23,38 @@ flowchart TD
 
 ---
 
-## 2. Selected Tech Stack & Tooling
+## 2. Tech Stack and Tooling
 
-| Komponen | Tools Pilihan | Alasan Pemilihan & Justifikasi |
+| Komponen | Tools Pilihan | Alasan Pemilihan |
 | :--- | :--- | :--- |
-| **Data Acquisition** | **Faker + Custom Indonesian Bank Lexicon** | Generasi 150+ mutasi realistis (BCA, Mandiri, GoPay, QRIS) tanpa ketergantungan API pihak ketiga. |
-| **Data Contract** | **Pandera** | Deklaratif, validasi tipe data dan rentang nilai ketat (*strict checks*), mencegah *silent bugs*. |
-| **Heuristic Engine** | **Python Regex / Trie Map** | Deterministic matching instan (<1ms), 0 rupiah biaya API, menyerap 40–60% transaksi umum. |
-| **AI Inference** | **Google Gemini 3.5 Flash Lite (REST)** | Model LLM tercepat dan paling efisien untuk ekstraksi teks terstruktur dengan kuota free tier. |
-| **Analytics Engine** | **DuckDB** | Zero-dependency embedded OLAP, kueri SQL agregasi <5ms untuk visualisasi dashboard. |
-| **Cloud Storage** | **Supabase PostgreSQL (Session Pooler)** | Penyimpanan data permanen cloud yang andal via driver `psycopg2-binary` pada port 5432. |
-| **Frontend / Delivery**| **Streamlit** | Dashboard interaktif modern berbasis Python murni untuk visualisasi dan storytelling portofolio. |
-| **Testing Suite** | **pytest** | Pengujian unit dan validasi kualitas klasifikasi otomatis (*Test-Driven Development*). |
+| **Data Acquisition** | **Faker + Kamus Merchant Indonesia** | Menghasilkan 150+ baris mutasi realistis (BCA, Mandiri, GoPay, QRIS) tanpa ketergantungan API eksternal. |
+| **Data Contract** | **Pandera** | Deklaratif, memvalidasi tipe data dan rentang nilai di batas sistem sebelum pemrosesan. |
+| **Heuristic Engine** | **Python Regex / Dictionary Map** | Pencocokan deterministik instan (<1ms), tanpa biaya API, menyelesaikan 40–60% transaksi umum. |
+| **AI Inference** | **Google Gemini 3.5 Flash Lite (REST)** | Menangani transaksi ambigu secara batch dengan format JSON terstruktur. |
+| **Analytics Engine** | **DuckDB** | Embedded OLAP tanpa dependensi server terpisah, kueri agregasi berjalan di bawah 5ms. |
+| **Cloud Storage** | **Supabase PostgreSQL (Session Pooler)** | Penyimpanan jangka panjang via pooler port 5432 untuk menjamin kompatibilitas jaringan IPv4. |
+| **Frontend** | **Streamlit** | Antarmuka analitik interaktif berbasis Python. |
+| **Testing Suite** | **pytest** | Pengujian unit otomatis untuk kontrak data, logika pembersihan, dan agregasi. |
 
 ---
 
-## 3. Trade-offs & Decision Rationale (ADR)
-*(Educational Mentorship Section - Mengapa arsitektur ini dipilih?)*
+## 3. Architecture Decision Records (ADR)
 <details>
-<summary>💡 Klik untuk Penjelasan Rationale & Trade-offs Teknis</summary>
+<summary>Rationale dan trade-off teknis</summary>
 
-* **Mengapa Hybrid (Rules + LLM) dan Bukan Full LLM?**
-  Mengirim 100% transaksi ke LLM itu mahal dan lambat. Transaksi seperti `"PAYMENT PLN TOKEN"` atau `"SPOTIFY PREMIUM"` memiliki kepastian deterministik 100%. Dengan menyaringnya di Tier-1 menggunakan Regex/Rules lokal, kita menghemat waktu roundtrip jaringan dan menghemat kuota request API secara drastis.
-* **Mengapa DuckDB bersama Supabase?**
-  Supabase adalah database transaksional (OLTP). Jika dashboard Streamlit sering melakukan kueri agregasi berat (`GROUP BY category`, `SUM(amount)`, `AVG(...)`), koneksi cloud akan menimbulkan latensi jaringan bolak-balik. DuckDB bertindak sebagai mesin analitik lokal (OLAP) di memori RAM, mengeksekusi kalkulasi metrik dalam hitungan milidetik.
-* **Mengapa Pandera di Pintu Depan (*Fail-Fast Principle*)?**
-  Jika ada nominal pengeluaran bernilai negatif, kolom tanggal yang formatnya rusak, atau nilai kosong di deskripsi, proses ETL seharusnya tidak boleh dilanjutkan. Pandera memastikan integritas data terjamin sebelum data menyentuh AI atau database.
+* **Hybrid (Rules + LLM) vs Full LLM**:
+  Mengirim seluruh baris transaksi ke LLM membuang waktu dan kuota. Transaksi seperti `"PAYMENT PLN TOKEN"` atau `"SPOTIFY"` memiliki pola tetap yang dapat diselesaikan oleh regex dalam <1ms. LLM hanya digunakan sebagai fallback untuk transaksi yang tidak cocok dengan aturan regex.
+* **DuckDB bersama Supabase**:
+  Supabase melayani penyimpanan transaksional (OLTP). Menjalankan kueri agregasi berulang dari dashboard ke database cloud menimbulkan latensi jaringan bolak-balik. DuckDB memproses kalkulasi agregasi langsung di memori lokal secara instan.
+* **Pandera di Pintu Awal (Fail-Fast)**:
+  Nilai nominal negatif, format tanggal yang salah, atau kolom yang hilang harus ditolak di awal sebelum data diproses oleh engine kategorisasi atau database.
 </details>
 
 ---
 
-## 4. Data Contract & Schema Specifications (Contract-First)
+## 4. Schema Specifications
 
-### A. Raw Ingestion Schema (`schemas.py` via Pandera)
+### A. Raw Ingestion Schema (`src/schemas.py`)
 ```python
 import pandera as pa
 from pandera.typing import Series
@@ -67,24 +66,24 @@ class RawTransactionSchema(pa.DataFrameModel):
     Raw_Description: Series[str] = pa.Field(nullable=False, str_length={"min_value": 3}, description="Keterangan transaksi")
 ```
 
-### B. Cleaned & Categorized Schema
+### B. Cleaned and Categorized Schema
 ```python
-class CategorizedTransactionSchema(pa.DataFrameModel):
-    Date: Series[pa.DateTime] = pa.Field(nullable=False)
+class CategorizedExpenseSchema(pa.DataFrameModel):
+    Date: Series[str] = pa.Field(nullable=False)
     Amount: Series[float] = pa.Field(ge=0, nullable=False)
     Raw_Description: Series[str] = pa.Field(nullable=False)
     Clean_Description: Series[str] = pa.Field(nullable=False)
     Category: Series[str] = pa.Field(isin=[
-        "F&B", "Transportasi", "Utilitas", "Hiburan", 
-        "Belanja", "Perawatan Kendaraan", "Transfer/Tarik Tunai", 
-        "Kebutuhan Rumah Tangga", "Lainnya"
+        "F&B", "Belanja", "Transportasi", "Utilitas", 
+        "Hiburan", "Kesehatan", "Pendidikan", "Transfer Keluar", 
+        "Biaya Admin & Pajak", "Lainnya"
     ])
-    Source: Series[str] = pa.Field(isin=["Heuristic_Rules", "Gemini_AI"])
+    Source: Series[str] = pa.Field(isin=["Heuristic_Rules", "Gemini_AI", "Fallback"])
 ```
 
 ---
 
-## 5. Reliability, Reliability & Failure Mode Mitigation
-- **Graceful API Fallback**: Jika kuota Gemini habis (HTTP 429) atau koneksi internet terputus, sistem secara otomatis menandai transaksi yang belum terpetakan sebagai `"Lainnya (Perlu Review)"` tanpa memutus jalannya pipeline.
-- **Deduplication Engine**: Hash unik `MD5(Date + Amount + Raw_Description)` untuk mencegah duplikasi data transaksi saat file mutasi diunggah berulang kali ke database.
-- **SQLAlchemy Session Pooler Protection**: Menggunakan `override=True` pada `.env` dan parameter `sslmode=require` untuk menjamin koneksi PostgreSQL Supabase selalu stabil.
+## 5. Failure Modes and Mitigation
+- **Koneksi atau Kuota Gemini Habis**: Jika panggilan API gagal atau kuota terlampaui (HTTP 429), sistem menetapkan label fallback `"Lainnya"` dan mencatat statusnya tanpa menghentikan pipeline.
+- **Dukungan Jaringan IPv4**: Menggunakan Supabase Session Pooler (`aws-0-ap-southeast-1.pooler.supabase.com:5432`) dengan `sslmode=require` untuk menghindari kegagalan koneksi pada provider internet yang belum mendukung IPv6.
+- **Validasi Nilai Ekstrem**: Pandera menolak mutasi dengan nilai `Amount` negatif atau nol sebelum tahap kalkulasi pengeluaran.
